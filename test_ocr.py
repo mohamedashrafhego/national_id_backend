@@ -10,8 +10,6 @@ from egyptian_id_extractor import (
     extract_serial_number,
 )
 
-import paddleocr
-print(paddleocr.__version__)
 
 print("TEST STARTED")
 
@@ -82,7 +80,6 @@ serial_number = extract_serial_number(items)
 print()
 print("Full Name:")
 print(full_name)
-print(paddleocr.__version__)
 
 print()
 print("National ID:")
