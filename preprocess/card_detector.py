@@ -4,28 +4,40 @@ import cv2
 import numpy as np
 
 
-# Egyptian ID cards are approximately 1.59:1
-# We use a range instead of one exact value.
-MIN_CARD_RATIO = 1.45
-MAX_CARD_RATIO = 1.72
-
-# Detection is performed on a smaller image for speed.
-MAX_DETECTION_SIDE = 700
-
-# Large dark connected regions are treated as obstacles
-# for the segmentation step.
-DARK_THRESHOLD = 25
-
-# Minimum size of a dark region relative to the image.
-MIN_DARK_AREA_RATIO = 0.005
+INPUT_PATH = Path("national_id.jpg")
+OUTPUT_DIR = Path("debug_card_detection")
 
 
-def resize_for_detection(
-    image: np.ndarray,
-    max_side: int = MAX_DETECTION_SIDE,
-):
+# ============================================================
+# Configuration
+# ============================================================
+
+MAX_SIDE = 1600
+
+# How much of the image border is considered
+# definite background.
+BORDER_RATIO = 0.04
+
+# Egyptian National ID approximate width / height ratio.
+# We use a broad range because perspective can change it.
+MIN_ASPECT_RATIO = 1.20
+MAX_ASPECT_RATIO = 2.20
+
+# Candidate area relative to complete image.
+MIN_AREA_RATIO = 0.20
+MAX_AREA_RATIO = 0.95
+
+# GrabCut iterations.
+GRABCUT_ITERATIONS = 8
+
+
+# ============================================================
+# Image utilities
+# ============================================================
+
+def resize_for_detection(image: np.ndarray):
     """
-    Resize image only for card detection.
+    Resize image only for detection speed.
 
     Returns:
         resized_image
@@ -34,13 +46,15 @@ def resize_for_detection(
 
     height, width = image.shape[:2]
 
-    scale = min(
-        1.0,
-        max_side / max(height, width),
+    largest_side = max(
+        height,
+        width,
     )
 
-    if scale == 1.0:
-        return image.copy(), scale
+    if largest_side <= MAX_SIDE:
+        return image.copy(), 1.0
+
+    scale = MAX_SIDE / largest_side
 
     resized = cv2.resize(
         image,
@@ -53,125 +67,63 @@ def resize_for_detection(
     return resized, scale
 
 
-def detect_large_dark_regions(
-    image: np.ndarray,
-) -> np.ndarray:
-    """
-    Detect very large dark connected components.
-
-    This prevents large dark objects / redaction blocks
-    from dominating GrabCut and contour detection.
-
-    Returns:
-        binary mask
-    """
-
-    gray = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2GRAY,
-    )
-
-    dark = np.where(
-        gray < DARK_THRESHOLD,
-        255,
-        0,
-    ).astype(np.uint8)
-
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
-        dark,
-        connectivity=8,
-    )
-
-    mask = np.zeros_like(dark)
-
-    image_area = image.shape[0] * image.shape[1]
-    min_area = image_area * MIN_DARK_AREA_RATIO
-
-    for label in range(1, num_labels):
-
-        area = stats[
-            label,
-            cv2.CC_STAT_AREA,
-        ]
-
-        if area >= min_area:
-            mask[labels == label] = 255
-
-    return mask
-
-
-def remove_dark_regions(
-    image: np.ndarray,
-    dark_mask: np.ndarray,
-) -> np.ndarray:
-    """
-    Inpaint large dark regions so they don't create
-    dominant segmentation boundaries.
-    """
-
-    if not np.any(dark_mask):
-        return image.copy()
-
-    return cv2.inpaint(
-        image,
-        dark_mask,
-        3,
-        cv2.INPAINT_TELEA,
-    )
-
+# ============================================================
+# GrabCut
+# ============================================================
 
 def create_grabcut_mask(
     image: np.ndarray,
-    dark_mask: np.ndarray,
-) -> np.ndarray:
+):
     """
-    Create a relative GrabCut initialization mask.
+    Create an initial GrabCut mask.
 
-    No fixed pixel coordinates are used.
+    The image border is definite background.
+    The rest is probable foreground.
+
+    This is dynamic and does not depend on card coordinates.
     """
 
     height, width = image.shape[:2]
 
     mask = np.full(
         (height, width),
-        cv2.GC_BGD,
+        cv2.GC_PR_FGD,
         dtype=np.uint8,
     )
 
-    # Large probable foreground area.
-    margin_x = int(width * 0.06)
-    margin_y = int(height * 0.08)
+    border = max(
+        5,
+        int(
+            min(height, width)
+            * BORDER_RATIO
+        ),
+    )
 
-    mask[
-        margin_y:height - margin_y,
-        margin_x:width - margin_x,
-    ] = cv2.GC_PR_FGD
+    # Top
+    mask[:border, :] = cv2.GC_BGD
 
-    # Smaller sure-foreground region.
-    # This is relative to the image dimensions.
-    sure_x = int(width * 0.18)
-    sure_y = int(height * 0.20)
+    # Bottom
+    mask[-border:, :] = cv2.GC_BGD
 
-    mask[
-        sure_y:height - sure_y,
-        sure_x:width - sure_x,
-    ] = cv2.GC_FGD
+    # Left
+    mask[:, :border] = cv2.GC_BGD
 
-    # Large dark regions should not become strong foreground seeds.
-    mask[dark_mask > 0] = cv2.GC_PR_BGD
+    # Right
+    mask[:, -border:] = cv2.GC_BGD
 
     return mask
 
 
-def grabcut_foreground(
+def run_grabcut(
     image: np.ndarray,
-    initial_mask: np.ndarray,
-) -> np.ndarray:
+):
     """
-    Run GrabCut and return a binary foreground mask.
+    Run GrabCut using only image-border information.
     """
 
-    mask = initial_mask.copy()
+    mask = create_grabcut_mask(
+        image
+    )
 
     background_model = np.zeros(
         (1, 65),
@@ -189,13 +141,17 @@ def grabcut_foreground(
         None,
         background_model,
         foreground_model,
-        2,
+        GRABCUT_ITERATIONS,
         cv2.GC_INIT_WITH_MASK,
     )
 
+    # Definite foreground OR probable foreground.
     foreground = np.where(
-        (mask == cv2.GC_FGD)
-        | (mask == cv2.GC_PR_FGD),
+        (
+            (mask == cv2.GC_FGD)
+            |
+            (mask == cv2.GC_PR_FGD)
+        ),
         255,
         0,
     ).astype(np.uint8)
@@ -203,39 +159,473 @@ def grabcut_foreground(
     return foreground
 
 
+# ============================================================
+# Mask cleanup
+# ============================================================
+
 def clean_foreground_mask(
-    foreground: np.ndarray,
-) -> np.ndarray:
+    mask: np.ndarray,
+):
     """
-    Remove small gaps and connect the card region.
+    Remove small noise and connect fragmented regions.
     """
 
-    height, width = foreground.shape[:2]
+    height, width = mask.shape
 
     kernel_size = max(
-        3,
-        int(round(0.015 * min(height, width))) | 1,
+        5,
+        int(
+            min(height, width)
+            * 0.015
+        ),
     )
+
+    # Make kernel odd.
+    if kernel_size % 2 == 0:
+        kernel_size += 1
 
     kernel = cv2.getStructuringElement(
         cv2.MORPH_ELLIPSE,
-        (kernel_size, kernel_size),
+        (
+            kernel_size,
+            kernel_size,
+        ),
     )
 
-    cleaned = cv2.morphologyEx(
-        foreground,
+    # Close gaps.
+    closed = cv2.morphologyEx(
+        mask,
         cv2.MORPH_CLOSE,
         kernel,
+        iterations=2,
     )
 
-    return cleaned
+    # Remove small holes.
+    filled = cv2.morphologyEx(
+        closed,
+        cv2.MORPH_CLOSE,
+        kernel,
+        iterations=2,
+    )
+
+    return filled
 
 
-def order_points(
-    points: np.ndarray,
-) -> np.ndarray:
+# ============================================================
+# Debug mask
+# ============================================================
+
+def save_mask_debug(
+    mask: np.ndarray,
+    path: Path,
+):
+    cv2.imwrite(
+        str(path),
+        mask,
+    )
+
+
+# ============================================================
+# Connected Components
+# ============================================================
+
+def get_components(
+    mask: np.ndarray,
+):
     """
-    Return points in this order:
+    Return connected components with geometry information,
+    along with the raw label image so a specific component's
+    mask can be rebuilt later (needed for contour extraction).
+    """
+
+    height, width = mask.shape
+
+    total_area = float(
+        height * width
+    )
+
+    number_labels, labels, stats, centroids = (
+        cv2.connectedComponentsWithStats(
+            mask,
+            connectivity=8,
+        )
+    )
+
+    components = []
+
+    for index in range(
+        1,
+        number_labels,
+    ):
+        x = int(stats[index, cv2.CC_STAT_LEFT])
+        y = int(stats[index, cv2.CC_STAT_TOP])
+
+        component_width = int(
+            stats[index, cv2.CC_STAT_WIDTH]
+        )
+
+        component_height = int(
+            stats[index, cv2.CC_STAT_HEIGHT]
+        )
+
+        area = int(
+            stats[index, cv2.CC_STAT_AREA]
+        )
+
+        if component_height <= 0:
+            continue
+
+        if component_width <= 0:
+            continue
+
+        area_ratio = (
+            area / total_area
+        )
+
+        bbox_ratio = (
+            component_width
+            / component_height
+        )
+
+        bbox_area = (
+            component_width
+            * component_height
+        )
+
+        rectangularity = (
+            area / bbox_area
+            if bbox_area > 0
+            else 0
+        )
+
+        components.append(
+            {
+                "label": index,
+                "x": x,
+                "y": y,
+                "width": component_width,
+                "height": component_height,
+                "area": area,
+                "area_ratio": area_ratio,
+                "ratio": bbox_ratio,
+                "rectangularity": rectangularity,
+            }
+        )
+
+    return components, labels
+
+
+# ============================================================
+# Candidate scoring
+# ============================================================
+
+def score_candidate(
+    candidate,
+    image_shape,
+):
+    """
+    Score how likely a connected component is to be
+    the ID card.
+    """
+
+    height, width = image_shape[:2]
+
+    area_ratio = candidate["area_ratio"]
+    ratio = candidate["ratio"]
+    rectangularity = candidate["rectangularity"]
+
+    score = 0.0
+
+    # --------------------------------------------------------
+    # Area
+    # --------------------------------------------------------
+
+    if (
+        MIN_AREA_RATIO
+        <= area_ratio
+        <= MAX_AREA_RATIO
+    ):
+        score += 35
+
+    else:
+        # Distance from allowed area range.
+        if area_ratio < MIN_AREA_RATIO:
+            distance = (
+                MIN_AREA_RATIO
+                - area_ratio
+            )
+        else:
+            distance = (
+                area_ratio
+                - MAX_AREA_RATIO
+            )
+
+        score -= min(
+            30,
+            distance * 100,
+        )
+
+    # --------------------------------------------------------
+    # Aspect ratio
+    # --------------------------------------------------------
+
+    if (
+        MIN_ASPECT_RATIO
+        <= ratio
+        <= MAX_ASPECT_RATIO
+    ):
+        score += 35
+
+        # Prefer something around
+        # a typical ID card ratio.
+        target_ratio = 1.59
+
+        ratio_error = abs(
+            ratio - target_ratio
+        )
+
+        score += max(
+            0,
+            15 - ratio_error * 15,
+        )
+
+    else:
+        score -= 30
+
+    # --------------------------------------------------------
+    # Rectangularity
+    # --------------------------------------------------------
+
+    # A card should occupy a large portion
+    # of its bounding rectangle.
+    score += min(
+        20,
+        rectangularity * 20,
+    )
+
+    # --------------------------------------------------------
+    # Size
+    # --------------------------------------------------------
+
+    candidate_width = candidate["width"]
+    candidate_height = candidate["height"]
+
+    width_ratio = (
+        candidate_width / width
+    )
+
+    height_ratio = (
+        candidate_height / height
+    )
+
+    if width_ratio > 0.50:
+        score += 5
+
+    if height_ratio > 0.40:
+        score += 5
+
+    # --------------------------------------------------------
+    # Border touching penalty
+    # --------------------------------------------------------
+
+    x = candidate["x"]
+    y = candidate["y"]
+
+    touches_left = x <= width * 0.01
+    touches_top = y <= height * 0.01
+
+    touches_right = (
+        x + candidate_width
+        >= width * 0.99
+    )
+
+    touches_bottom = (
+        y + candidate_height
+        >= height * 0.99
+    )
+
+    border_count = sum(
+        [
+            touches_left,
+            touches_top,
+            touches_right,
+            touches_bottom,
+        ]
+    )
+
+    # The card should not be the complete image.
+    score -= border_count * 15
+
+    return score
+
+
+def find_best_candidate(
+    components,
+    image_shape,
+):
+    """
+    Select the best card candidate.
+    """
+
+    scored = []
+
+    for candidate in components:
+
+        score = score_candidate(
+            candidate,
+            image_shape,
+        )
+
+        candidate_copy = (
+            candidate.copy()
+        )
+
+        candidate_copy["score"] = score
+
+        scored.append(
+            candidate_copy
+        )
+
+    scored.sort(
+        key=lambda item: item["score"],
+        reverse=True,
+    )
+
+    return scored
+
+
+# ============================================================
+# Corners
+# ============================================================
+
+def get_component_mask(
+    labels: np.ndarray,
+    label: int,
+):
+    """
+    Rebuild a binary mask for a single connected component.
+    """
+
+    return np.where(
+        labels == label,
+        255,
+        0,
+    ).astype(np.uint8)
+
+
+# Contour polygon approximation is tried at increasing epsilon
+# ratios (relative to the contour perimeter) until a convex
+# quadrilateral is found.
+CORNER_EPSILON_RATIOS = (
+    0.01,
+    0.015,
+    0.02,
+    0.025,
+    0.03,
+    0.04,
+    0.05,
+)
+
+
+def find_contour_corners(
+    mask: np.ndarray,
+):
+    """
+    Find the card's real 4 corners from its component mask.
+
+    Component Mask -> Find Contour -> approxPolyDP -> 4 corners
+
+    Returns an (4, 2) array of unordered corners, or None if no
+    convex quadrilateral could be extracted from the contour.
+    """
+
+    contours, _ = cv2.findContours(
+        mask,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+
+    if not contours:
+        return None
+
+    contour = max(
+        contours,
+        key=cv2.contourArea,
+    )
+
+    perimeter = cv2.arcLength(
+        contour,
+        True,
+    )
+
+    if perimeter <= 0:
+        return None
+
+    for epsilon_ratio in CORNER_EPSILON_RATIOS:
+
+        approx = cv2.approxPolyDP(
+            contour,
+            epsilon_ratio * perimeter,
+            True,
+        )
+
+        if len(approx) != 4:
+            continue
+
+        if not cv2.isContourConvex(approx):
+            continue
+
+        return approx.reshape(4, 2).astype(np.float32)
+
+    # Noisy outline: fall back to the minimum-area rectangle of
+    # the actual contour (still real geometry, not a fixed angle).
+    rect = cv2.minAreaRect(contour)
+
+    return cv2.boxPoints(rect)
+
+
+def get_rotated_corners(
+    candidate,
+):
+    """
+    Get 4 corners using minAreaRect.
+
+    This is more flexible than simply returning
+    the bounding-box corners.
+    """
+
+    x = candidate["x"]
+    y = candidate["y"]
+
+    width = candidate["width"]
+    height = candidate["height"]
+
+    rect = (
+        (
+            x + width / 2,
+            y + height / 2,
+        ),
+        (
+            width,
+            height,
+        ),
+        0,
+    )
+
+    corners = cv2.boxPoints(
+        rect
+    )
+
+    return order_corners(
+        corners
+    )
+
+
+def order_corners(
+    points,
+):
+    """
+    Return corners in this order:
 
         top-left
         top-right
@@ -243,278 +633,66 @@ def order_points(
         bottom-left
     """
 
-    points = points.astype(np.float32)
-
-    sums = points.sum(axis=1)
-    differences = points[:, 1] - points[:, 0]
-
-    top_left = points[np.argmin(sums)]
-    top_right = points[np.argmin(differences)]
-    bottom_right = points[np.argmax(sums)]
-    bottom_left = points[np.argmax(differences)]
-
-    return np.array(
-        [
-            top_left,
-            top_right,
-            bottom_right,
-            bottom_left,
-        ],
+    points = np.asarray(
+        points,
         dtype=np.float32,
     )
 
-
-def find_card_rectangle(
-    foreground: np.ndarray,
-) -> np.ndarray | None:
-    """
-    Find the largest card-like foreground component.
-
-    The candidate must satisfy:
-    - reasonable area
-    - reasonable ID-card aspect ratio
-    - reasonable rectangle fill
-    """
-
-    height, width = foreground.shape[:2]
-
-    contours, _ = cv2.findContours(
-        foreground,
-        cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE,
+    ordered = np.zeros(
+        (4, 2),
+        dtype=np.float32,
     )
 
-    image_area = height * width
-
-    candidates = []
-
-    for contour in contours:
-
-        area = cv2.contourArea(contour)
-
-        # Ignore small objects.
-        if area < image_area * 0.25:
-            continue
-
-        rectangle = cv2.minAreaRect(contour)
-
-        rect_width, rect_height = rectangle[1]
-
-        if rect_width <= 0 or rect_height <= 0:
-            continue
-
-        ratio = max(
-            rect_width,
-            rect_height,
-        ) / min(
-            rect_width,
-            rect_height,
-        )
-
-        if not (
-            MIN_CARD_RATIO
-            <= ratio
-            <= MAX_CARD_RATIO
-        ):
-            continue
-
-        rectangle_area = rect_width * rect_height
-
-        if rectangle_area <= 0:
-            continue
-
-        fill_ratio = area / rectangle_area
-
-        if fill_ratio < 0.55:
-            continue
-
-        # Prefer large, well-filled rectangles.
-        score = area * fill_ratio
-
-        candidates.append(
-            (
-                score,
-                rectangle,
-            )
-        )
-
-    if not candidates:
-        return None
-
-    candidates.sort(
-        key=lambda item: item[0],
-        reverse=True,
+    sums = points.sum(
+        axis=1
     )
 
-    best_rectangle = candidates[0][1]
-
-    box = cv2.boxPoints(
-        best_rectangle
+    differences = (
+        points[:, 1]
+        - points[:, 0]
     )
 
-    return box.astype(np.float32)
-
-
-def detect_card(
-    image: np.ndarray,
-) -> np.ndarray:
-    """
-    Main card detection function.
-
-    Returns 4 points in original-image coordinates:
-
-        [
-            top_left,
-            top_right,
-            bottom_right,
-            bottom_left,
-        ]
-    """
-
-    detection_image, scale = resize_for_detection(
-        image
-    )
-
-    # Detect large dark regions dynamically.
-    dark_mask = detect_large_dark_regions(
-        detection_image
-    )
-
-    # Remove their influence from segmentation.
-    clean_image = remove_dark_regions(
-        detection_image,
-        dark_mask,
-    )
-
-    # Create relative GrabCut initialization.
-    grabcut_mask = create_grabcut_mask(
-        clean_image,
-        dark_mask,
-    )
-
-    # Segment foreground.
-    foreground = grabcut_foreground(
-        clean_image,
-        grabcut_mask,
-    )
-
-    # Clean segmentation.
-    foreground = clean_foreground_mask(
-        foreground
-    )
-
-    # Find card.
-    points = find_card_rectangle(
-        foreground
-    )
-
-    if points is None:
-        raise RuntimeError(
-            "Could not detect a valid card rectangle."
-        )
-
-    # Convert coordinates back to original image size.
-    points = points / scale
-
-    points = order_points(
-        points
-    )
-
-    return points
-
-
-def draw_debug(
-    image: np.ndarray,
-    points: np.ndarray,
-) -> np.ndarray:
-    """
-    Draw detected card rectangle and corners.
-    """
-
-    output = image.copy()
-
-    polygon = np.round(
-        points
-    ).astype(np.int32)
-
-    polygon = polygon.reshape(
-        (-1, 1, 2)
-    )
-
-    # Rectangle
-    cv2.polylines(
-        output,
-        [polygon],
-        True,
-        (0, 255, 0),
-        6,
-    )
-
-    labels = [
-        "TL",
-        "TR",
-        "BR",
-        "BL",
+    ordered[0] = points[
+        np.argmin(sums)
     ]
 
-    for point, label in zip(
-        points,
-        labels,
-    ):
+    ordered[2] = points[
+        np.argmax(sums)
+    ]
 
-        x, y = np.round(
-            point
-        ).astype(int)
+    ordered[1] = points[
+        np.argmin(differences)
+    ]
 
-        cv2.circle(
-            output,
-            (x, y),
-            14,
-            (0, 0, 255),
-            -1,
-        )
+    ordered[3] = points[
+        np.argmax(differences)
+    ]
 
-        cv2.putText(
-            output,
-            label,
-            (x + 15, y - 15),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1.0,
-            (255, 0, 0),
-            3,
-        )
-
-    return output
+    return ordered
 
 
-def main():
-    input_path = Path(
-        "national_id.jpg"
+# ============================================================
+# Debug drawing
+# ============================================================
+
+def draw_card_debug(
+    image,
+    corners,
+):
+    output = image.copy()
+
+    points = corners.astype(
+        np.int32
     )
 
-    output_path = Path(
-        "card_detected.jpg"
+    # Card polygon
+    cv2.polylines(
+        output,
+        [points],
+        True,
+        (0, 255, 0),
+        5,
     )
-
-    image = cv2.imread(
-        str(input_path)
-    )
-
-    if image is None:
-        raise FileNotFoundError(
-            f"Could not read image: {input_path}"
-        )
-
-    print(
-        f"Image size: "
-        f"{image.shape[1]} x {image.shape[0]}"
-    )
-
-    points = detect_card(
-        image
-    )
-
-    print("\nDetected card corners:")
 
     labels = [
         "top_left",
@@ -523,30 +701,335 @@ def main():
         "bottom_left",
     ]
 
-    for label, point in zip(
-        labels,
-        points,
+    for index, (
+        point,
+        label,
+    ) in enumerate(
+        zip(points, labels)
     ):
+
         x, y = point
 
-        print(
-            f"{label}: "
-            f"({x:.1f}, {y:.1f})"
+        cv2.circle(
+            output,
+            (x, y),
+            12,
+            (0, 0, 255),
+            -1,
         )
 
-    debug_image = draw_debug(
-        image,
-        points,
+        cv2.putText(
+            output,
+            f"{index}: {label}",
+            (
+                x + 15,
+                y - 15,
+            ),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 0, 0),
+            2,
+        )
+
+    return output
+
+
+def draw_candidates(
+    image,
+    candidates,
+):
+    output = image.copy()
+
+    for index, candidate in enumerate(
+        candidates[:10]
+    ):
+
+        x = candidate["x"]
+        y = candidate["y"]
+
+        width = candidate["width"]
+        height = candidate["height"]
+
+        score = candidate["score"]
+
+        cv2.rectangle(
+            output,
+            (
+                x,
+                y,
+            ),
+            (
+                x + width,
+                y + height,
+            ),
+            (0, 255, 255),
+            2,
+        )
+
+        cv2.putText(
+            output,
+            f"{index}: score={score:.1f}",
+            (
+                x,
+                max(
+                    20,
+                    y - 10,
+                ),
+            ),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 0, 255),
+            2,
+        )
+
+    return output
+
+
+# ============================================================
+# Main detector
+# ============================================================
+
+def detect_card(
+    image: np.ndarray,
+):
+    """
+    Main dynamic card detection API.
+
+    Returns:
+
+        np.ndarray shape (4, 2)
+
+    ordered as:
+
+        top-left
+        top-right
+        bottom-right
+        bottom-left
+    """
+
+    original_height, original_width = (
+        image.shape[:2]
     )
 
-    cv2.imwrite(
-        str(output_path),
-        debug_image,
+    working_image, scale = (
+        resize_for_detection(image)
+    )
+
+    # --------------------------------------------------------
+    # 1. GrabCut
+    # --------------------------------------------------------
+
+    foreground_mask = run_grabcut(
+        working_image
+    )
+
+    # --------------------------------------------------------
+    # 2. Clean mask
+    # --------------------------------------------------------
+
+    foreground_mask = (
+        clean_foreground_mask(
+            foreground_mask
+        )
+    )
+
+    # --------------------------------------------------------
+    # 3. Connected components
+    # --------------------------------------------------------
+
+    components, labels = get_components(
+        foreground_mask
     )
 
     print(
-        f"\nDebug image saved to: "
-        f"{output_path}"
+        f"Components found: "
+        f"{len(components)}"
+    )
+
+    # --------------------------------------------------------
+    # 4. Score candidates
+    # --------------------------------------------------------
+
+    candidates = find_best_candidate(
+        components,
+        working_image.shape,
+    )
+
+    print(
+        "\nCard candidates:"
+    )
+
+    for index, candidate in enumerate(
+        candidates[:10]
+    ):
+
+        print(
+            f"{index}: "
+            f"score={candidate['score']:.2f}, "
+            f"area_ratio={candidate['area_ratio']:.3f}, "
+            f"bbox=("
+            f"{candidate['x']},"
+            f"{candidate['y']},"
+            f"{candidate['width']},"
+            f"{candidate['height']}"
+            f"), "
+            f"ratio={candidate['ratio']:.3f}, "
+            f"rectangularity="
+            f"{candidate['rectangularity']:.3f}"
+        )
+
+    if not candidates:
+        raise RuntimeError(
+            "No card candidates found."
+        )
+
+    best = candidates[0]
+
+    if best["score"] < 30:
+        raise RuntimeError(
+            "Could not confidently detect "
+            "the ID card."
+        )
+
+    # --------------------------------------------------------
+    # 5. Get corners from the best component's real outline
+    # --------------------------------------------------------
+
+    component_mask = get_component_mask(
+        labels,
+        best["label"],
+    )
+
+    save_mask_debug(
+        component_mask,
+        OUTPUT_DIR / "component_mask.jpg",
+    )
+
+    raw_corners = find_contour_corners(
+        component_mask
+    )
+
+    if raw_corners is None:
+        # No usable contour: fall back to the axis-aligned
+        # bounding box so detection never hard-fails.
+        corners = get_rotated_corners(
+            best
+        )
+    else:
+        corners = order_corners(
+            raw_corners
+        )
+
+    # --------------------------------------------------------
+    # 6. Convert back to original image
+    # --------------------------------------------------------
+
+    if scale != 1.0:
+        corners /= scale
+
+    # Keep points inside image.
+    corners[:, 0] = np.clip(
+        corners[:, 0],
+        0,
+        original_width - 1,
+    )
+
+    corners[:, 1] = np.clip(
+        corners[:, 1],
+        0,
+        original_height - 1,
+    )
+
+    return corners
+
+
+# ============================================================
+# Test
+# ============================================================
+
+def main():
+
+    if not INPUT_PATH.exists():
+        raise FileNotFoundError(
+            f"Image not found: "
+            f"{INPUT_PATH}"
+        )
+
+    image = cv2.imread(
+        str(INPUT_PATH)
+    )
+
+    if image is None:
+        raise RuntimeError(
+            "Could not read image."
+        )
+
+    print(
+        f"Original image size: "
+        f"{image.shape[1]} x "
+        f"{image.shape[0]}"
+    )
+
+    OUTPUT_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    # --------------------------------------------------------
+    # Detection
+    # --------------------------------------------------------
+
+    corners = detect_card(
+        image
+    )
+
+    print(
+        "\nDetected card corners:"
+    )
+
+    names = [
+        "top_left",
+        "top_right",
+        "bottom_right",
+        "bottom_left",
+    ]
+
+    for name, point in zip(
+        names,
+        corners,
+    ):
+
+        print(
+            f"{name}: "
+            f"({point[0]:.1f}, "
+            f"{point[1]:.1f})"
+        )
+
+    # --------------------------------------------------------
+    # Debug output
+    # --------------------------------------------------------
+
+    debug = draw_card_debug(
+        image,
+        corners,
+    )
+
+    debug_path = (
+        OUTPUT_DIR
+        / "card_detected.jpg"
+    )
+
+    cv2.imwrite(
+        str(debug_path),
+        debug,
+    )
+
+    print(
+        f"\nDebug image:"
+    )
+
+    print(
+        debug_path
     )
 
 
