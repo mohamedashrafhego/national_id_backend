@@ -30,6 +30,11 @@ MAX_AREA_RATIO = 0.95
 # GrabCut iterations.
 GRABCUT_ITERATIONS = 8
 
+# Fixed output size for the normalized card, used so
+# downstream steps can define regions in relative coordinates.
+NORMALIZED_WIDTH = 1400
+NORMALIZED_HEIGHT = 840
+
 
 # ============================================================
 # Image utilities
@@ -944,6 +949,113 @@ def detect_card(
 
 
 # ============================================================
+# Perspective Correction
+# ============================================================
+
+def perspective_correct(
+    image: np.ndarray,
+    points: np.ndarray,
+):
+    """
+    Warp the detected card region into a straight,
+    front-facing rectangle.
+
+    points must already be ordered as:
+
+        top_left
+        top_right
+        bottom_right
+        bottom_left
+
+    Output width/height are derived from the corner
+    distances themselves, so the card's natural aspect
+    ratio is preserved without any hardcoded coordinates.
+    """
+
+    source = points.astype(
+        np.float32
+    )
+
+    top_left, top_right, bottom_right, bottom_left = source
+
+    top_width = np.linalg.norm(
+        top_right - top_left
+    )
+
+    bottom_width = np.linalg.norm(
+        bottom_right - bottom_left
+    )
+
+    left_height = np.linalg.norm(
+        bottom_left - top_left
+    )
+
+    right_height = np.linalg.norm(
+        bottom_right - top_right
+    )
+
+    output_width = max(
+        1,
+        int(round(max(top_width, bottom_width))),
+    )
+
+    output_height = max(
+        1,
+        int(round(max(left_height, right_height))),
+    )
+
+    destination = np.array(
+        [
+            [0, 0],
+            [output_width - 1, 0],
+            [output_width - 1, output_height - 1],
+            [0, output_height - 1],
+        ],
+        dtype=np.float32,
+    )
+
+    matrix = cv2.getPerspectiveTransform(
+        source,
+        destination,
+    )
+
+    corrected_card = cv2.warpPerspective(
+        image,
+        matrix,
+        (output_width, output_height),
+    )
+
+    return corrected_card
+
+
+# ============================================================
+# Card Normalization
+# ============================================================
+
+def normalize_card(
+    image: np.ndarray,
+):
+    """
+    Resize the perspective-corrected card to a fixed size so
+    later steps can locate fields using relative coordinates.
+
+    No cropping is performed, only a full resize to
+    NORMALIZED_WIDTH x NORMALIZED_HEIGHT.
+    """
+
+    normalized_card = cv2.resize(
+        image,
+        (
+            NORMALIZED_WIDTH,
+            NORMALIZED_HEIGHT,
+        ),
+        interpolation=cv2.INTER_AREA,
+    )
+
+    return normalized_card
+
+
+# ============================================================
 # Test
 # ============================================================
 
@@ -1030,6 +1142,79 @@ def main():
 
     print(
         debug_path
+    )
+
+    # --------------------------------------------------------
+    # Perspective correction
+    # --------------------------------------------------------
+
+    corrected_card = perspective_correct(
+        image,
+        corners,
+    )
+
+    corrected_height, corrected_width = (
+        corrected_card.shape[:2]
+    )
+
+    print(
+        f"\nCorrected card size: "
+        f"{corrected_width} x "
+        f"{corrected_height}"
+    )
+
+    corrected_path = (
+        OUTPUT_DIR
+        / "card_corrected.jpg"
+    )
+
+    cv2.imwrite(
+        str(corrected_path),
+        corrected_card,
+    )
+
+    print(
+        f"\nCorrected image:"
+    )
+
+    print(
+        corrected_path
+    )
+
+    # --------------------------------------------------------
+    # Normalization
+    # --------------------------------------------------------
+
+    normalized_card = normalize_card(
+        corrected_card
+    )
+
+    normalized_height, normalized_width = (
+        normalized_card.shape[:2]
+    )
+
+    print(
+        f"\nNormalized card size: "
+        f"{normalized_width} x "
+        f"{normalized_height}"
+    )
+
+    normalized_path = (
+        OUTPUT_DIR
+        / "card_normalized.jpg"
+    )
+
+    cv2.imwrite(
+        str(normalized_path),
+        normalized_card,
+    )
+
+    print(
+        f"\nNormalized image:"
+    )
+
+    print(
+        normalized_path
     )
 
 

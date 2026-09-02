@@ -1,0 +1,29 @@
+
+=== HEADER ===
+مَيَ (confidence=0.47)
+مالعَ (confidence=0.47)
+حهوَرَن مْصَُ (confidence=0.47)
+تحقيق (confidence=0.93)
+بطاقة (confidence=0.99)
+الشخصية (confidence=1.00)
+
+=== NAME ===
+الحجاو (confidence=0.95)
+على (confidence=0.93)
+محمد (confidence=0.99)
+ى (confidence=0.59)
+
+=== RELIGION_STATUS ===
+Cع (confidence=0.53)
+
+=== ADDRESS ===
+سيناء (confidence=0.99)
+شمال (confidence=0.99)
+رابع (confidence=1.00)
+عريش (confidence=0.94)
+
+=== NATIONAL_ID_NUMBER ===
+(no text detected)
+
+=== SERIAL_NUMBER ===
+V (confidence=0.80)

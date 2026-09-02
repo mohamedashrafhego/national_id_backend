@@ -1,0 +1,282 @@
+
+=== HEADER ===
+
+original:
+  text="مَيَ مالعَ حهوَرَن مْصَُ تحقيق بطاقة الشخصية"
+  confidence=0.72
+  score=0.86
+
+grayscale:
+  text="مهورَيَ عَصَ العَيَ تحقيق بطاقة الشخصية"
+  confidence=0.78
+  score=0.89
+
+upscale_2x:
+  text="حمه ية مَصَ العَِيَم تحقيق الشخصية بطاقة"
+  confidence=0.80
+  score=0.89
+
+clahe:
+  text="يويقيي  ا ي يية"
+  confidence=0.35
+  score=0.69
+
+upscale_clahe:
+  text="ييييي يي را يلية"
+  confidence=0.51
+  score=0.77
+
+adaptive_threshold:
+  text="مَهُرَ فصَ العَربية الشخصية تحقيق بطاقة"
+  confidence=0.81
+  score=0.90
+
+otsu_threshold:
+  text="لُد َ مصَ الحَيَة الشخصية بطلاة تقيق"
+  confidence=0.75
+  score=0.87
+
+upscale_3x_contrast:
+  text="  ايةا "
+  confidence=0.11
+  score=0.54
+
+SELECTED:
+  variant=adaptive_threshold
+  text="مَهُرَ فصَ العَربية الشخصية تحقيق بطاقة"
+  confidence=0.81
+
+=== NAME ===
+
+original:
+  text="الحجاو على محمد ى"
+  confidence=0.87
+  score=0.91
+
+grayscale:
+  text="مد الحجاو على محمد ى"
+  confidence=0.84
+  score=0.90
+
+upscale_2x:
+  text="الحجاو على محمد ى"
+  confidence=0.92
+  score=0.93
+
+clahe:
+  text="الحجاوى على محمد"
+  confidence=0.98
+  score=0.97
+
+upscale_clahe:
+  text="الحجاوى على محمد"
+  confidence=0.98
+  score=0.97
+
+adaptive_threshold:
+  text="الحجاوى على محمد"
+  confidence=0.86
+  score=0.92
+
+otsu_threshold:
+  text="شرف محمد على الحجاوى حمد"
+  confidence=0.94
+  score=0.91
+
+upscale_3x_contrast:
+  text="الحجاوى"
+  confidence=0.92
+  score=0.84
+
+SELECTED:
+  variant=upscale_clahe
+  text="الحجاوى على محمد"
+  confidence=0.98
+
+=== RELIGION_STATUS ===
+
+original:
+  text="Cع"
+  confidence=0.53
+  score=0.65
+
+grayscale:
+  text=""
+  confidence=0.00
+  score=0.00
+
+upscale_2x:
+  text="Cع"
+  confidence=0.31
+  score=0.56
+
+clahe:
+  text=""
+  confidence=0.00
+  score=0.00
+
+upscale_clahe:
+  text=""
+  confidence=0.00
+  score=0.00
+
+adaptive_threshold:
+  text="عروج"
+  confidence=0.96
+  score=1.07
+
+otsu_threshold:
+  text="روج"
+  confidence=0.80
+  score=0.99
+
+upscale_3x_contrast:
+  text=""
+  confidence=0.00
+  score=0.00
+
+SELECTED:
+  variant=adaptive_threshold
+  text="عروج"
+  confidence=0.96
+
+=== ADDRESS ===
+
+original:
+  text="سيناء شمال رابع عريش"
+  confidence=0.98
+  score=0.96
+
+grayscale:
+  text="سيناء شمال لعريش رابع"
+  confidence=0.89
+  score=0.93
+
+upscale_2x:
+  text="رابع  شمال سيناء"
+  confidence=0.95
+  score=0.91
+
+clahe:
+  text="عريشس رابع شمال سيناء"
+  confidence=0.93
+  score=0.91
+
+upscale_clahe:
+  text="ابع شمال سيناء"
+  confidence=0.93
+  score=0.91
+
+adaptive_threshold:
+  text="يث رابع  شمال سيناء"
+  confidence=0.94
+  score=0.87
+
+otsu_threshold:
+  text="ريش رابع  شمال سيناء"
+  confidence=0.93
+  score=0.87
+
+upscale_3x_contrast:
+  text=""
+  confidence=0.00
+  score=0.00
+
+SELECTED:
+  variant=original
+  text="سيناء شمال رابع عريش"
+  confidence=0.98
+
+=== NATIONAL_ID_NUMBER ===
+
+original:
+  text=""
+  confidence=0.00
+  score=0.00
+
+grayscale:
+  text=""
+  confidence=0.00
+  score=0.00
+
+upscale_2x:
+  text=""
+  confidence=0.00
+  score=0.00
+
+clahe:
+  text=""
+  confidence=0.00
+  score=0.00
+
+upscale_clahe:
+  text="٦٣٤٠ ٠٧٢"
+  confidence=0.86
+  score=1.20
+
+adaptive_threshold:
+  text="N"
+  confidence=0.20
+  score=0.27
+
+otsu_threshold:
+  text="٠٧٢٦٣٤٠ ٣٧"
+  confidence=0.79
+  score=1.24
+
+upscale_3x_contrast:
+  text=""
+  confidence=0.00
+  score=0.00
+
+SELECTED:
+  variant=otsu_threshold
+  text="٠٧٢٦٣٤٠ ٣٧"
+  confidence=0.79
+
+=== SERIAL_NUMBER ===
+
+original:
+  text="V"
+  confidence=0.80
+  score=0.97
+
+grayscale:
+  text=""
+  confidence=0.00
+  score=0.00
+
+upscale_2x:
+  text=""
+  confidence=0.00
+  score=0.00
+
+clahe:
+  text=""
+  confidence=0.00
+  score=0.00
+
+upscale_clahe:
+  text=""
+  confidence=0.00
+  score=0.00
+
+adaptive_threshold:
+  text="K1675309"
+  confidence=0.93
+  score=1.10
+
+otsu_threshold:
+  text="KM675300"
+  confidence=0.83
+  score=1.07
+
+upscale_3x_contrast:
+  text=""
+  confidence=0.00
+  score=0.00
+
+SELECTED:
+  variant=adaptive_threshold
+  text="K1675309"
+  confidence=0.93
