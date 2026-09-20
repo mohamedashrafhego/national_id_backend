@@ -336,17 +336,17 @@ def extract_full_name_from_crop(ocr, image_path):
     # OCR
     # --------------------------------------------------
 
-    result = ocr.predict(temp_path)
+    result = ocr.ocr(temp_path, cls=False)
 
     items = []
 
     for page in result:
+        if page is None:
+            continue
 
-        texts = page.get("rec_texts", [])
-        scores = page.get("rec_scores", [])
-        boxes = page.get("rec_boxes", [])
-
-        for text, score, box in zip(texts, scores, boxes):
+        for line in page:
+            box = line[0]
+            text, score = line[1]
 
             text = clean_text(text)
 
@@ -356,7 +356,11 @@ def extract_full_name_from_crop(ocr, image_path):
             if score < 0.70:
                 continue
 
-            left, top, right, bottom = box
+            # box is [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+            left = min(p[0] for p in box)
+            right = max(p[0] for p in box)
+            top = min(p[1] for p in box)
+            bottom = max(p[1] for p in box)
 
             center_x = (left + right) // 2
             center_y = (top + bottom) // 2

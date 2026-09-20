@@ -2,133 +2,148 @@
 === HEADER ===
 
 original:
-  text="مَيَ مالعَ حهوَرَن مْصَُ تحقيق بطاقة الشخصية"
-  confidence=0.72
-  score=0.86
-
-grayscale:
-  text="مهورَيَ عَصَ العَيَ تحقيق بطاقة الشخصية"
-  confidence=0.78
-  score=0.89
-
-upscale_2x:
-  text="حمه ية مَصَ العَِيَم تحقيق الشخصية بطاقة"
-  confidence=0.80
-  score=0.89
-
-clahe:
-  text="يويقيي  ا ي يية"
-  confidence=0.35
-  score=0.69
-
-upscale_clahe:
-  text="ييييي يي را يلية"
-  confidence=0.51
-  score=0.77
-
-adaptive_threshold:
-  text="مَهُرَ فصَ العَربية الشخصية تحقيق بطاقة"
-  confidence=0.81
+  text="صم ةَْوُهمح عا َرم هيب ةقاطب قيقحت ةيصخشلا"
+  confidence=0.79
   score=0.90
 
+grayscale:
+  text="هصم َوه مح عل َم هيبب ةقاطب قيقحت ةيصخشلا"
+  confidence=0.82
+  score=0.91
+
+upscale_2x:
+  text="هصم يَوه مح علا َرم هيبب ةقاطب قيقحت ةيصخشلا"
+  confidence=0.78
+  score=0.90
+
+clahe:
+  text="مصم ررَوُه مح َعلا َُم ةقاطب قيقحت ةيصخشلا"
+  confidence=0.82
+  score=0.91
+
+upscale_clahe:
+  text="مصم ررَوُه مح َعلا َُم هَيح ةقاطب قيقحت ةيصخشلا"
+  confidence=0.76
+  score=0.89
+
+adaptive_threshold:
+  text="حلا  ةيزوه مج هّييب ةقاطب قيقت ةيصخشلا"
+  confidence=0.85
+  score=0.92
+
 otsu_threshold:
-  text="لُد َ مصَ الحَيَة الشخصية بطلاة تقيق"
-  confidence=0.75
-  score=0.87
+  text="هبرعلا صم هَل ةقاطب قيقعت ةيصخشلا"
+  confidence=0.85
+  score=0.88
+
+thickened:
+  text="هبرعلا صم َُن ةقاعب قيقعت ةيصخشلا"
+  confidence=0.86
+  score=0.89
 
 upscale_3x_contrast:
-  text="  ايةا "
-  confidence=0.11
-  score=0.54
+  text="ةيروه مج ص ةَِبلا َم ةقاطب قيقحت ةيصخشلا"
+  confidence=0.81
+  score=0.91
 
 SELECTED:
   variant=adaptive_threshold
-  text="مَهُرَ فصَ العَربية الشخصية تحقيق بطاقة"
-  confidence=0.81
+  text="حلا  ةيزوه مج هّييب ةقاطب قيقت ةيصخشلا"
+  confidence=0.85
 
 === NAME ===
 
 original:
-  text="الحجاو على محمد ى"
-  confidence=0.87
-  score=0.91
+  text="دمحم فرشا  دمحم ىلع ىواجحلا"
+  confidence=0.92
+  score=0.94
 
 grayscale:
-  text="مد الحجاو على محمد ى"
-  confidence=0.84
-  score=0.90
-
-upscale_2x:
-  text="الحجاو على محمد ى"
-  confidence=0.92
-  score=0.93
-
-clahe:
-  text="الحجاوى على محمد"
-  confidence=0.98
-  score=0.97
-
-upscale_clahe:
-  text="الحجاوى على محمد"
-  confidence=0.98
-  score=0.97
-
-adaptive_threshold:
-  text="الحجاوى على محمد"
-  confidence=0.86
+  text=" دمحم فرشا  دمحم ىلع ىواجحلا"
+  confidence=0.87
   score=0.92
 
+upscale_2x:
+  text=" دمحم فرشا  دمحم ىلع ىواجحلا"
+  confidence=0.87
+  score=0.92
+
+clahe:
+  text=" دمحم فرشا  دمحم ىلع ىواجحلا"
+  confidence=0.91
+  score=0.94
+
+upscale_clahe:
+  text=" دمحم فرشا  دمحم ىلع ىواجحلا"
+  confidence=0.87
+  score=0.92
+
+adaptive_threshold:
+  text="دمحم فرشا دمحم ىلع ىواجحلا"
+  confidence=0.97
+  score=0.96
+
 otsu_threshold:
-  text="شرف محمد على الحجاوى حمد"
-  confidence=0.94
-  score=0.91
+  text="دم فرا دمجم ىع ىواجحلا"
+  confidence=0.89
+  score=0.93
+
+thickened:
+  text="دم فرا مم ىع ىواجحلا"
+  confidence=0.88
+  score=0.92
 
 upscale_3x_contrast:
-  text="الحجاوى"
-  confidence=0.92
-  score=0.84
+  text="ىواجحلا"
+  confidence=0.91
+  score=0.72
 
 SELECTED:
-  variant=upscale_clahe
-  text="الحجاوى على محمد"
-  confidence=0.98
+  variant=adaptive_threshold
+  text="دمحم فرشا دمحم ىلع ىواجحلا"
+  confidence=0.97
 
 === RELIGION_STATUS ===
 
 original:
-  text="Cع"
-  confidence=0.53
-  score=0.65
+  text="ملسم جورع"
+  confidence=0.94
+  score=0.98
 
 grayscale:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="ملسم جورع"
+  confidence=0.99
+  score=1.00
 
 upscale_2x:
-  text="Cع"
-  confidence=0.31
-  score=0.56
+  text="ملسم جورع"
+  confidence=0.99
+  score=1.00
 
 clahe:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="ملسم جورع"
+  confidence=0.99
+  score=1.00
 
 upscale_clahe:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="ملسم جورع"
+  confidence=0.97
+  score=0.99
 
 adaptive_threshold:
-  text="عروج"
-  confidence=0.96
-  score=1.07
+  text="ملسم جورع"
+  confidence=0.99
+  score=0.99
 
 otsu_threshold:
-  text="روج"
-  confidence=0.80
-  score=0.99
+  text="ملمم جورع"
+  confidence=0.89
+  score=0.96
+
+thickened:
+  text="ملمم جورع"
+  confidence=0.89
+  score=0.96
 
 upscale_3x_contrast:
   text=""
@@ -136,46 +151,51 @@ upscale_3x_contrast:
   score=0.00
 
 SELECTED:
-  variant=adaptive_threshold
-  text="عروج"
-  confidence=0.96
+  variant=grayscale
+  text="ملسم جورع"
+  confidence=0.99
 
 === ADDRESS ===
 
 original:
-  text="سيناء شمال رابع عريش"
-  confidence=0.98
-  score=0.96
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.99
+  score=0.93
 
 grayscale:
-  text="سيناء شمال لعريش رابع"
-  confidence=0.89
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.98
   score=0.93
 
 upscale_2x:
-  text="رابع  شمال سيناء"
-  confidence=0.95
-  score=0.91
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.99
+  score=0.93
 
 clahe:
-  text="عريشس رابع شمال سيناء"
-  confidence=0.93
-  score=0.91
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.97
+  score=0.92
 
 upscale_clahe:
-  text="ابع شمال سيناء"
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.95
+  score=0.92
+
+adaptive_threshold:
+  text="ثيرعلا عبار لامش ءانيس"
   confidence=0.93
   score=0.91
 
-adaptive_threshold:
-  text="يث رابع  شمال سيناء"
-  confidence=0.94
-  score=0.87
-
 otsu_threshold:
-  text="ريش رابع  شمال سيناء"
-  confidence=0.93
-  score=0.87
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.96
+  score=0.92
+
+thickened:
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.97
+  score=0.92
 
 upscale_3x_contrast:
   text=""
@@ -183,46 +203,51 @@ upscale_3x_contrast:
   score=0.00
 
 SELECTED:
-  variant=original
-  text="سيناء شمال رابع عريش"
-  confidence=0.98
+  variant=upscale_2x
+  text="شيرعلا عبار لامش ءانيس"
+  confidence=0.99
 
 === NATIONAL_ID_NUMBER ===
 
 original:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="٧٣ ٤٣ ٦٢"
+  confidence=0.89
+  score=1.06
 
 grayscale:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="٧٣ ٤٣ ٦٢ ٧"
+  confidence=0.84
+  score=1.09
 
 upscale_2x:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="٧٣ ٤٣ ٦٢  "
+  confidence=0.78
+  score=1.06
 
 clahe:
+  text="٧٣ ٤٣ ٦٢"
+  confidence=0.84
+  score=1.04
+
+upscale_clahe:
+  text="٧٣ ٤٣ ٦٢"
+  confidence=0.82
+  score=1.04
+
+adaptive_threshold:
+  text="٤7٢"
+  confidence=0.50
+  score=0.91
+
+otsu_threshold:
   text=""
   confidence=0.00
   score=0.00
 
-upscale_clahe:
-  text="٦٣٤٠ ٠٧٢"
-  confidence=0.86
-  score=1.20
-
-adaptive_threshold:
-  text="N"
-  confidence=0.20
-  score=0.27
-
-otsu_threshold:
-  text="٠٧٢٦٣٤٠ ٣٧"
-  confidence=0.79
-  score=1.24
+thickened:
+  text=""
+  confidence=0.00
+  score=0.00
 
 upscale_3x_contrast:
   text=""
@@ -230,46 +255,51 @@ upscale_3x_contrast:
   score=0.00
 
 SELECTED:
-  variant=otsu_threshold
-  text="٠٧٢٦٣٤٠ ٣٧"
-  confidence=0.79
+  variant=grayscale
+  text="٧٣ ٤٣ ٦٢ ٧"
+  confidence=0.84
 
 === SERIAL_NUMBER ===
 
 original:
-  text="V"
-  confidence=0.80
-  score=0.97
+  text="53093"
+  confidence=0.84
+  score=0.93
 
 grayscale:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="3093"
+  confidence=0.98
+  score=0.96
 
 upscale_2x:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="3093"
+  confidence=0.98
+  score=0.96
 
 clahe:
-  text=""
-  confidence=0.00
-  score=0.00
+  text="3093"
+  confidence=0.80
+  score=0.91
 
 upscale_clahe:
+  text="093"
+  confidence=0.77
+  score=0.89
+
+adaptive_threshold:
+  text="3093"
+  confidence=0.94
+  score=0.95
+
+otsu_threshold:
   text=""
   confidence=0.00
   score=0.00
 
-adaptive_threshold:
-  text="K1675309"
-  confidence=0.93
-  score=1.10
-
-otsu_threshold:
-  text="KM675300"
-  confidence=0.83
-  score=1.07
+thickened:
+  text=""
+  confidence=0.00
+  score=0.00
 
 upscale_3x_contrast:
   text=""
@@ -277,6 +307,6 @@ upscale_3x_contrast:
   score=0.00
 
 SELECTED:
-  variant=adaptive_threshold
-  text="K1675309"
-  confidence=0.93
+  variant=upscale_2x
+  text="3093"
+  confidence=0.98

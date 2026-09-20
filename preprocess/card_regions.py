@@ -63,12 +63,12 @@ CARD_REGIONS = {
         "width": 0.63,
         "height": 0.12,
     },
-    # National ID number, Arabic-Indic digits, bottom right.
+    # National ID number - expanded to full width to ensure no digits are cut off
     "national_id_number": {
-        "x": 0.42,
-        "y": 0.76,
-        "width": 0.55,
-        "height": 0.11,
+        "x": 0.05,
+        "y": 0.70,
+        "width": 0.90,
+        "height": 0.20,
     },
     # Emblem + issue/expiry number, directly under the photo.
     "emblem_area": {
@@ -80,9 +80,9 @@ CARD_REGIONS = {
     # Machine-readable serial number, bottom-left strip.
     "serial_number": {
         "x": 0.00,
-        "y": 0.90,
-        "width": 0.33,
-        "height": 0.10,
+        "y": 0.85,
+        "width": 0.60,
+        "height": 0.15,
     },
 }
 

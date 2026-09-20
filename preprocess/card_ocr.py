@@ -14,6 +14,7 @@ import re
 import sys
 
 import cv2
+import numpy as np
 
 from paddleocr import PaddleOCR
 
@@ -67,6 +68,8 @@ def get_ocr():
         _ocr_instance = PaddleOCR(
             lang="ar",
             enable_mkldnn=False,
+            use_angle_cls=True,
+            show_log=False,
         )
 
     return _ocr_instance
@@ -140,19 +143,23 @@ def run_ocr_on_regions(
                 crop,
             )
 
-        prediction = ocr.predict(crop)
+        prediction = ocr.ocr(crop, cls=False)
 
         entries = []
 
         for page in prediction:
+            if page is None:
+                continue
 
-            texts = page.get("rec_texts", [])
-            scores = page.get("rec_scores", [])
-            boxes = page.get("rec_boxes", [])
+            for line in page:
+                box = line[0]
+                text, score = line[1]
 
-            for text, score, box in zip(texts, scores, boxes):
-
-                left, top, right, bottom = box
+                # box is [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+                left = min(p[0] for p in box)
+                right = max(p[0] for p in box)
+                top = min(p[1] for p in box)
+                bottom = max(p[1] for p in box)
 
                 # Map the crop-local box back onto the full
                 # normalized card so results from every region
@@ -277,6 +284,11 @@ def preprocess_ocr_variants(
         otsu
     )
 
+    # NEW: Dilation variant specifically for tiny dots (zeros) and thin fonts
+    kernel = np.ones((2, 2), np.uint8)
+    dilated = cv2.erode(otsu, kernel, iterations=1) # Erosion on binary inverse = Dilation on text
+    variants["thickened"] = _to_bgr(dilated)
+
     upscale_3x = cv2.resize(
         gray,
         None,
@@ -300,22 +312,31 @@ def _run_ocr_on_image(
     Run PaddleOCR on a single image and return its raw entries.
     """
 
-    prediction = ocr.predict(image)
+    prediction = ocr.ocr(image, cls=False)
 
     entries = []
 
     for page in prediction:
+        if page is None:
+            continue
 
-        texts = page.get("rec_texts", [])
-        scores = page.get("rec_scores", [])
-        boxes = page.get("rec_boxes", [])
+        for line in page:
+            box = line[0]
+            text, score = line[1]
 
-        for text, score, box in zip(texts, scores, boxes):
+            # Convert polygon [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+            # to [left, top, right, bottom] for compatibility with
+            # _order_entries_for_reading
+            left = min(p[0] for p in box)
+            right = max(p[0] for p in box)
+            top = min(p[1] for p in box)
+            bottom = max(p[1] for p in box)
+
             entries.append(
                 {
                     "text": text,
                     "confidence": float(score),
-                    "box": box,
+                    "box": [left, top, right, bottom],
                 }
             )
 
@@ -454,6 +475,132 @@ _VALID_CHAR_RE = re.compile(r"[A-Za-z0-9\u0600-\u06FF\s]")
 # Egyptian National ID numbers are 14 digits long.
 EXPECTED_NATIONAL_ID_DIGITS = 14
 
+ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩"
+EXTENDED_ARABIC_INDIC_DIGITS = "۰۱۲۳۴۵۶۷۸۹"  # U+06F0..U+06F9 (Persian/Urdu)
+ENGLISH_DIGITS = "0123456789"
+DIGIT_MAP = str.maketrans(
+    ARABIC_INDIC_DIGITS + EXTENDED_ARABIC_INDIC_DIGITS,
+    ENGLISH_DIGITS + ENGLISH_DIGITS,
+)
+
+# Characters that Egyptian ID zero-groups (printed as small dots) can be
+# recognized as. All are treated as "0". (Only true dot/middot glyphs --
+# never spaces or letters, which would inject false zeros.)
+ZERO_LIKE_CHARS = ".\u00b7\u2022\u2024\u2027\u2219\u22c5\u06d4\u066b\u066c\u2025\u2026"
+
+def normalize_digits(text):
+    """Convert Arabic-Indic digits to English digits and handle zeros."""
+    if not text: return ""
+    # The zero groups on Egyptian IDs are printed as small dots, which OCR
+    # often returns as one of several dot/middot glyphs. Treat them as zeros.
+    for ch in ZERO_LIKE_CHARS:
+        text = text.replace(ch, "0")
+    return text.translate(DIGIT_MAP)
+
+
+def _is_plausible_egyptian_id(digits):
+    """
+    Check whether a 14-digit string is a structurally valid Egyptian
+    National ID. Used to decide the correct reading orientation, since
+    the Arabic OCR model emits digits right-to-left (reversed).
+
+    Layout: C YY MM DD GG SSS G
+        C  century (2 = 1900s, 3 = 2000s)
+        YY year, MM month (01-12), DD day (01-31)
+        GG governorate code, SSSS serial, last = checksum/gender
+    """
+    if len(digits) != 14 or not digits.isdigit():
+        return False
+    if digits[0] not in ("2", "3"):
+        return False
+    month = int(digits[3:5])
+    day = int(digits[5:7])
+    if not (1 <= month <= 12):
+        return False
+    if not (1 <= day <= 31):
+        return False
+    if int(digits[7:9]) == 0:
+        return False
+    return True
+
+
+def orient_national_id(digits):
+    """
+    Return the National ID digits in correct left-to-right order.
+
+    The Arabic OCR recognizer reads numbers right-to-left, which flips
+    the digit order (e.g. 30007263400037 -> 73000436270003). We pick
+    whichever orientation forms a structurally valid Egyptian ID; if
+    neither validates (e.g. some digits were dropped), fall back to the
+    rule that Egyptian IDs always start with 2 or 3.
+    """
+    if not digits:
+        return digits
+
+    reversed_digits = digits[::-1]
+
+    if _is_plausible_egyptian_id(digits):
+        return digits
+    if _is_plausible_egyptian_id(reversed_digits):
+        return reversed_digits
+
+    # Partial capture fallback: an ID starts with 2/3, never ends with it.
+    if digits[0] not in ("2", "3") and digits[-1] in ("2", "3"):
+        return reversed_digits
+
+    return digits
+
+def clean_arabic_text(text):
+    """Fix character reversal for Arabic names, but leave digits alone."""
+    if not text: return ""
+    
+    # If it's mostly digits, don't reverse it (numbers are L-to-R)
+    if sum(c.isdigit() or c in ARABIC_INDIC_DIGITS or c == "." for c in text) > len(text) / 3:
+        return normalize_digits(text)
+
+    # Reverse characters in each word for Arabic text
+    words = text.split()
+    fixed_words = [w[::-1] for w in words]
+    text = " ".join(fixed_words)
+    
+    # Keep only Arabic characters and spaces
+    text = re.sub(r"[^\u0600-\u06FF\s]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def extract_clean_data(selected_results, original_image_id=None):
+    """
+    Final extraction layer. Merges religion and address, and improves ID capture.
+    """
+    cleaned = {}
+
+    # 1. Full Name
+    name_raw = selected_results.get("name", {}).get("text", "")
+    cleaned["full_name"] = clean_arabic_text(name_raw)
+
+    # 2. National ID Number
+    # Priority 1: Use the brute-force search result from the original image
+    # Priority 2: Use the cropped region result
+    id_raw = original_image_id or selected_results.get("national_id_number", {}).get("text", "")
+
+    id_norm = normalize_digits(id_raw)
+    id_digits = "".join(re.findall(r"[0-9]", id_norm))
+
+    # Arabic OCR reads numbers right-to-left, flipping the digit order.
+    # Restore correct left-to-right order (e.g. 73000436270003 -> 30007263400037).
+    id_digits = orient_national_id(id_digits)
+
+    cleaned["national_id"] = id_digits
+    cleaned["id_is_valid"] = len(id_digits) == EXPECTED_NATIONAL_ID_DIGITS
+
+    # 3. Merged Address (Religion/Status + Address)
+    rel_raw = selected_results.get("religion_status", {}).get("text", "")
+    addr_raw = selected_results.get("address", {}).get("text", "")
+
+    full_address = f"{clean_arabic_text(rel_raw)} {clean_arabic_text(addr_raw)}".strip()
+    cleaned["address"] = full_address
+
+    return cleaned
 
 def _char_ratio(text, pattern):
     if not text:
@@ -603,6 +750,71 @@ def select_best_result(
 # ============================================================
 # Test
 # ============================================================
+
+def process_image(image_path, ocr=None):
+    """
+    Complete pipeline: Detection -> Normalization -> OCR -> Extraction.
+    Returns the final cleaned data dictionary.
+    """
+    image = cv2.imread(str(image_path))
+    if image is None:
+        raise ValueError(f"Could not read image at {image_path}")
+
+    if ocr is None:
+        ocr = get_ocr()
+
+    # 1. Pipeline orchestration
+    from preprocess.card_regions import get_card_regions
+    
+    # BRUTE FORCE SEARCH for the 14-digit ID in the whole image
+    # This is often more reliable than crops because context helps the OCR.
+    raw_full_ocr = _run_ocr_on_image(ocr, image)
+    best_full_id = None
+    
+    # Join all detected numeric fragments in the bottom-right of the image
+    # (where the National ID sits) into one string.
+    bottom_digits = []
+    img_h, img_w = image.shape[0], image.shape[1]
+    for entry in raw_full_ocr:
+        box = entry["box"]
+        center_y = (box[1] + box[3]) / 2
+        center_x = (box[0] + box[2]) / 2
+        # The ID number occupies the bottom band and the right ~60% of the
+        # card. Skipping the left side avoids the date stamp / serial number.
+        if center_y > img_h * 0.6 and center_x > img_w * 0.35:
+            digits = "".join(re.findall(r"[0-9]", normalize_digits(entry["text"])))
+            if digits:
+                bottom_digits.append((box[0], digits)) # (x_coord, digits)
+
+    # The recognizer reverses each fragment's digits, so join the fragments
+    # right-to-left (Arabic reading order). orient_national_id() then flips
+    # the whole string back to correct left-to-right order.
+    bottom_digits.sort(key=lambda x: x[0], reverse=True)
+    combined_digits = "".join([d[1] for d in bottom_digits])
+
+    if len(combined_digits) >= 10:
+        best_full_id = combined_digits
+
+    corners = detect_card(image)
+    corrected_card = perspective_correct(image, corners)
+    normalized_card = normalize_card(corrected_card)
+    
+    # Using corrected_card (High Res) for better OCR results on small digits
+    high_res_regions = get_card_regions(corrected_card)
+
+    selected_results = {}
+
+    for name in TEXT_REGIONS:
+        region = high_res_regions[name]
+        crop = crop_region(corrected_card, region)
+
+        # Run variants and pick best
+        variant_results = run_ocr_variants(crop, name, ocr=ocr)
+        best = select_best_result(variant_results, name)
+        selected_results[name] = best
+
+    # 2. Final Extraction with original image fallback for the ID
+    return extract_clean_data(selected_results, original_image_id=best_full_id)
 
 def main():
 
@@ -857,6 +1069,25 @@ def main():
         print(
             selected_results[name]
         )
+
+    # --------------------------------------------------------
+    # FINAL CLEAN EXTRACTION
+    # --------------------------------------------------------
+    print("\n" + "="*50)
+    print("FINAL EXTRACTED DATA")
+    print("="*50)
+    
+    final_data = extract_clean_data(selected_results)
+    
+    import json
+    print(json.dumps(final_data, indent=2, ensure_ascii=False))
+
+    # Save to JSON
+    json_path = OUTPUT_DIR / "final_data.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(final_data, f, indent=2, ensure_ascii=False)
+        
+    print(f"\nFinal data saved to: {json_path}")
 
 
 if __name__ == "__main__":

@@ -1,29 +1,33 @@
 
 === HEADER ===
-مَيَ (confidence=0.47)
-مالعَ (confidence=0.47)
-حهوَرَن مْصَُ (confidence=0.47)
-تحقيق (confidence=0.93)
-بطاقة (confidence=0.99)
-الشخصية (confidence=1.00)
+هَيبب (confidence=0.53)
+علا م ةيزوهمج (confidence=0.72)
+ةيصخشلا (confidence=1.00)
+قيقحت (confidence=0.94)
+ةقاطب (confidence=0.94)
 
 === NAME ===
-الحجاو (confidence=0.95)
-على (confidence=0.93)
-محمد (confidence=0.99)
-ى (confidence=0.59)
+ دمحم (confidence=0.84)
+ىلع (confidence=0.79)
+فرشا (confidence=0.98)
+ىواجحلا (confidence=0.98)
+ دمحم (confidence=0.84)
 
 === RELIGION_STATUS ===
-Cع (confidence=0.53)
+ملسم (confidence=0.99)
+جورع (confidence=0.99)
 
 === ADDRESS ===
-سيناء (confidence=0.99)
-شمال (confidence=0.99)
-رابع (confidence=1.00)
-عريش (confidence=0.94)
+ءانيس (confidence=0.96)
+لامش (confidence=1.00)
+عبار (confidence=1.00)
+شيرعلا (confidence=1.00)
 
 === NATIONAL_ID_NUMBER ===
-(no text detected)
+٦٢١ (confidence=0.82)
+٤٣ (confidence=0.91)
+٧٣ (confidence=0.96)
+٦٢ (confidence=0.65)
 
 === SERIAL_NUMBER ===
-V (confidence=0.80)
+6753093٧ (confidence=0.93)
